@@ -1,0 +1,25 @@
+.card {
+    height: 300px;
+    width: auto;
+    padding: 10px;
+    border-radius: 14px;
+
+    background-color: white;
+    box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.5);
+}
+
+.review-card {
+    height: auto;
+    width: auto;
+    padding: 10px;
+    border-radius: 2px;
+
+    background-color: white;
+    box-shadow: 0px 0px 4px rgba(0, 0, 0, 0.5);
+}
+
+
+
+/* .main-card {
+    display: flex;
+} */
