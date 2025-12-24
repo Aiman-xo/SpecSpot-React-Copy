@@ -27,7 +27,7 @@ function Products() {
 
     useEffect(() => {
         async function ProductList() {
-            const resp = await axios.get('https://specspot.duckdns.org/api/v1/products');
+            const resp = await axios.get('https://specspot.duckdns.org/api/v1/products/');
             const data = await resp.data;
             setProducts(data);
             setDetails(data)
