@@ -20,7 +20,7 @@ function Featured() {
 
     useEffect(() => {
         async function products() {
-            const resp = await axios.get('https://specspot.duckdns.org/api/v1/products');
+            const resp = await axios.get('https://specspot.duckdns.org/api/v1/products/');
             const data1 = await resp.data;
             setData(data1);
         }
