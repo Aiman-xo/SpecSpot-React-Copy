@@ -1,6 +1,6 @@
 function Api() {
-    const users1 = 'https://specspot-db.onrender.com/users';
-    const products1 = 'https://specspot-db.onrender.com/products';
+    const users1 = '/admin/users/';
+    const products1 = '/admin/admin-products/';
     return {
         users1,
         products1

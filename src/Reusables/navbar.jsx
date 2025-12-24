@@ -2,6 +2,8 @@ import React, { useEffect } from 'react'
 import { useState, useContext } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { searchContext } from '../Context-API/context';
+// import { authFetch } from '../refreshFetch/api';
+import api from '../refreshFetch/api';
 // import { User } from "lucide-react"
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -21,81 +23,135 @@ function Navbar() {
     let nav = useNavigate();
 
     useEffect(() => {
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
-            setShowLogin(true);
-            return
-        }
         async function getCartLength() {
-            const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-            const data = resp.data;
-            setCartLength(data.cart.length)
-            setWishlistLength(data.wishlist.length)
-            // setCartlength(data.cart);
-            // setWishLength(data.wishlist);
-        }
-        getCartLength()
-    })
+            const access = sessionStorage.getItem("access_token");
 
-    function LogOut() {
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
-            // alert("please login first");
-            toast.warning('please login first')
-            nav('/login')
+            if (!access) {
+                setShowLogin(true);
+                return;
+            }
+
+            try {
+                const resp = await api.get(
+                    "/cart/"
+                );
+
+                // resp is array of cart items
+                setCartLength(resp.data.length);
+
+
+            } catch (err) {
+                console.log(err);
+            }
         }
-        else {
+
+        getCartLength();
+    }, []);
+
+    useEffect(() => {
+        async function getWishlistLength() {
+            const access = sessionStorage.getItem("access_token");
+
+            if (!access) {
+                setShowLogin(true);
+                return;
+            }
+
+            try {
+                const resp = await api.get(
+                    "/wishlist/"
+                );
+
+                // resp is array of wishlist items
+                setWishlistLength(resp.data.length);
+
+            } catch (err) {
+                console.log(err);
+            }
+        }
+
+        getWishlistLength();
+    }, []);
+
+
+
+    async function LogOut() {
+        const token = sessionStorage.getItem('access_token')
+        if (!token) {
+            toast.warning('Please login first');
+            nav('/login');
+            return;
+        }
+
+        try {
+            // Call backend logout endpoint to clear refresh token
+            await axios.post('https://specspot.duckdns.org/api/v1/user/logout/', {}, {
+                withCredentials: true // Important for cookie-based logout
+            });
+        } catch (error) {
+            console.log('Logout API call completed');
+        } finally {
+            // Clear all frontend storage
             localStorage.removeItem("userId");
             localStorage.removeItem("role");
-            toast.error('logging out...')
-            nav('/')
+            localStorage.removeItem("status");
+            localStorage.removeItem("userName");
+            localStorage.removeItem("adminId");
+
+            sessionStorage.removeItem('access_token');
+            // Reset states
             setCartLength(0);
             setWishlistLength(0);
+            setShowLogin(true); // Show login options again
 
+            toast.success('Logged out successfully!');
+            nav('/login');
         }
-
     }
 
     function LgCheckforWishlist() {
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
-            // alert("please login first");
-            toast.warning('please login first')
-            nav('/login')
+        const access = sessionStorage.getItem("access_token");
+
+        if (!access) {
+            toast.warning("Please login first");
+            nav("/login");
+            return;
         }
-        else {
-            nav('/wishlist')
-        }
+
+        nav("/wishlist");
     }
+
 
     function LgCheckforProfile() {
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
-            // alert("please login first");
-            toast.warning('please login first')
-            nav('/login')
+        const access = sessionStorage.getItem("access_token");
+
+        if (!access) {
+            toast.warning("Please login first");
+            nav("/login");
+            return;
         }
-        else {
-            nav('/profile')
-        }
+
+        nav("/profile");
     }
 
+
     function LgCheckforCart() {
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
-            // alert("please login first");
-            toast.warning('please login first')
-            nav('/login')
+        const access = sessionStorage.getItem("access_token");
+
+        if (!access) {
+            toast.warning("Please login first");
+            nav("/login");
+            return;
         }
-        else {
-            nav('/cart')
-        }
+
+        nav("/cart");
     }
+
 
     //search option
     useEffect(() => {
         async function Getproducts() {
-            const resp = await axios.get('https://specspot-db.onrender.com/products');
+            const resp = await axios.get('https://specspot.duckdns.org/api/v1/products');
             const data = resp.data;
             setProducts(data);
         }
@@ -127,12 +183,12 @@ function Navbar() {
     }, [search])
 
     function checkAdmin() {
-        const adminId = localStorage.getItem("adminId");
-        if (adminId) {
-            nav('/admin')
-        } else {
+        // const adminId = localStorage.getItem("adminId");
+        // if (adminId) {
+        //     nav('/admin')
+        // } else {
             nav('/login')
-        }
+        // }
     }
 
 

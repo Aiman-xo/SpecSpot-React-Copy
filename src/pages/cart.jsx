@@ -1,10 +1,11 @@
 import React, { useContext, useEffect, useState } from 'react'
 import Navbar from '../Reusables/navbar'
 import { toast } from "react-toastify";
+// import { authFetch } from '../refreshFetch/authFetch';
 // import { useContext } from 'react'
 // import { searchContext } from '../Context-API/context'
 import '../mystyle.css'
-import axios from 'axios'
+import api from '../refreshFetch/api';
 import { data, Link, useNavigate } from 'react-router-dom';
 import { searchContext } from '../Context-API/context';
 
@@ -20,82 +21,108 @@ function Cart() {
     //shipping sharge
 
     const shipping = 10;
+    console.log(userDetail);
 
 
-
-    async function RemoveCartItem(removeInd, removedProduct) {
-        let userId = localStorage.getItem("userId")
-        toast.error(`${removedProduct} is removed from your cart`)
-        const filtered = userDetail.cart.filter((val) => {
-
-            return val.id !== removeInd
-        })
-        setuserDetails({ cart: filtered })
-
-        await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-            cart: filtered
-        });
-        setCartLength(filtered.length)
-
-
-
+    async function RemoveCartItem(productId, removedProduct) {
+        toast.error(`${removedProduct} is removed from your cart`);
+    
+        try {
+            // Use your authenticated fetch helper
+            await api.delete(`/cart/${productId}/`)
+    
+            // Update local state after backend success
+            setuserDetails(prev => ({
+                cart: prev.cart.filter(item => item.product.id !== productId)
+            }));
+    
+            setCartLength(prev => prev - 1);
+    
+        } catch (error) {
+            console.error("Delete failed: ", error);
+            toast.error("Failed to remove item");
+        }
     }
+    
     let userId = localStorage.getItem("userId")
     useEffect(() => {
         setCartLoading(true);
-        setTimeout(() => {
-            setCartLoading(false)
-        }, 2000)
+    
         async function getCart() {
-            const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-            const userDetails = await resp.data;
-            setuserDetails(userDetails)
+            try {
+                const data = await api.get(`/cart/`)
+    
+                setuserDetails({ cart: data.data });
+            } catch (error) {
+                console.error("Failed to load cart", error);
+                toast.error("Please login first");
+                nav("/login");
+            } finally {
+                setCartLoading(false);
+            }
         }
-        getCart()
-    }, [])
+    
+        getCart();
+    }, []);
+    
 
     async function IncreCart(productId) {
-        const updatedCart = userDetail.cart.map((cartItems) => {
-            return cartItems.id === productId ? { ...cartItems, cartQty: cartItems.cartQty + 1 } : cartItems
-        })
-
-
-        setuserDetails(pre => ({ ...pre, cart: updatedCart }))
-        await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-            cart: updatedCart
-        });
+        try {
+            const resp = await api.patch(`/cart/quantity/${productId}/`,
+                { action: "increase" });
+    
+            // Update quantity in UI instantly
+            setuserDetails(prev => ({
+                ...prev,
+                cart: prev.cart.map(item =>
+                    item.product.id === productId
+                        ? { ...item, cartQty: resp.data.qty }
+                        : item
+                )
+            }));
+    
+        } catch (error) {
+            console.error("Increase failed:", error);
+            toast.error("Could not increase quantity");
+        }
     }
+    
 
     async function DecreCart(productId) {
-        const updatedCart = userDetail.cart.map((cartItems) => {
-            // return cartItems.id === productId ? { ...cartItems, cartQty: cartItems.cartQty - 1 } : cartItems
-            if (cartItems.id === productId) {
-                return {
-                    ...cartItems,
-                    cartQty: cartItems.cartQty > 1 ? cartItems.cartQty - 1 : 1
-                }
+        try {
+            const resp = await api.patch(`/cart/quantity/${productId}/`,
+                { action: "decrease" }
+            );
+    
+            if (resp.message === "min_reached") {
+                toast.info("Minimum quantity reached");
             }
-            else {
-                return cartItems
-            }
-        })
-        console.log(updatedCart)
-
-        setuserDetails(pre => ({ ...pre, cart: updatedCart }))
-        await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-            cart: updatedCart
-        });
+    
+            // Update quantity in UI based on backend response
+            setuserDetails(prev => ({
+                ...prev,
+                cart: prev.cart.map(item =>
+                    item.product.id === productId
+                        ? { ...item, cartQty: resp.data.qty }
+                        : item
+                )
+            }));
+    
+        } catch (error) {
+            toast.error("Could not decrease quantity");
+        }
     }
+    
 
-    async function GetOrders() {
-        const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-        const data = resp.data;
-    }
+    // async function GetOrders() {
+    //     const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
+    //     const data = resp.data;
+    // }
 
     //printing total logic
 
     const total = userDetail.cart.reduce((acc, val) => {
-        const itemTotal = val.price * val.cartQty;
+        const itemTotal = val.product.price * val.cartQty;
         return ((acc + itemTotal + (itemTotal * 0.10)))
     }, 0);
 
@@ -150,7 +177,7 @@ function Cart() {
 
 
 
-                    <style jsx>{`
+                    <style jsx="true">{`
             @keyframes cartMove {
                 0% { 
                     transform: translateX(-50px);
@@ -286,7 +313,7 @@ function Cart() {
                         <div className="flex flex-col justify-center items-center mt-20">
                             <div className="bg-white rounded-2xl shadow-lg p-12 text-center max-w-md mx-auto">
                                 <div className="w-24 h-24 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" stroke="red" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 48 48">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" stroke="red" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 48 48">
                                         <circle cx="14" cy="41" r="3" />
                                         <circle cx="36" cy="41" r="3" />
                                         <path d="M8 13h32l-3 18H12L8 13zm2 0V9a1 1 0 0 1 1-1h3m24 5V9a1 1 0 0 0-1-1h-3" />
@@ -309,6 +336,7 @@ function Cart() {
 
                             <div className="space-y-6">
                                 {userDetail.cart.map((val) => {
+                                    console.log(val.product.image);
                                     return (
                                         <div
                                             className="bg-white rounded-lg shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden "
@@ -320,8 +348,8 @@ function Cart() {
 
                                                     <Link to={`/induvidual/${val.id}`} className="block">
                                                         <img
-                                                            src={val.image}
-                                                            alt={val.model}
+                                                            src={val.product.image}
+                                                            alt={val.product.model}
                                                             className="w-40 md:w-48 h-auto object-contain transition-transform duration-300 hover:scale-105"
                                                         />
                                                     </Link>
@@ -331,26 +359,26 @@ function Cart() {
                                                 <div className="md:w-2/3 p-6 flex flex-col justify-between">
                                                     <div>
                                                         <div className="flex justify-between items-start mb-3">
-                                                            <h3 className="text-xl font-bold text-gray-900">{val.brand}</h3>
+                                                            <h3 className="text-xl font-bold text-gray-900">{val.product.brand}</h3>
 
                                                         </div>
 
                                                         <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
                                                             <div className="bg-gray-50 rounded-lg p-2">
                                                                 <span className="text-gray-500">Model:</span>
-                                                                <span className="text-gray-700 font-medium ml-1">{val.model}</span>
+                                                                <span className="text-gray-700 font-medium ml-1">{val.product.model}</span>
                                                             </div>
                                                             <div className="bg-gray-50 rounded-lg p-2">
                                                                 <span className="text-gray-500">Type:</span>
-                                                                <span className="text-gray-700 font-medium ml-1">{val.type}</span>
+                                                                <span className="text-gray-700 font-medium ml-1">{val.product.category_name}</span>
                                                             </div>
                                                             <div className="bg-gray-50 rounded-lg p-2">
                                                                 <span className="text-gray-500">Frame:</span>
-                                                                <span className="text-gray-700 font-medium ml-1">{val.frame_material}</span>
+                                                                <span className="text-gray-700 font-medium ml-1">{val.product.frame_material}</span>
                                                             </div>
                                                             <div className="bg-gray-50 rounded-lg p-2">
                                                                 <span className="text-gray-500">Unit Price:</span>
-                                                                <span className="text-green-600 font-semibold ml-1">$ {val.price}</span>
+                                                                <span className="text-green-600 font-semibold ml-1">$ {val.product.price}</span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -362,7 +390,7 @@ function Cart() {
                                                             <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden">
                                                                 <button
                                                                     className="bg-white text-gray-700 font-bold px-3 py-2 hover:bg-gray-50 transition-all cursor-pointer border-r border-gray-200"
-                                                                    onClick={() => DecreCart(val.id)}
+                                                                    onClick={() => DecreCart(val.product.id)}
                                                                 >
                                                                     -
                                                                 </button>
@@ -371,7 +399,7 @@ function Cart() {
                                                                 </div>
                                                                 <button
                                                                     className="bg-white text-gray-700 font-bold px-3 py-2 hover:bg-gray-50 transition-all cursor-pointer"
-                                                                    onClick={() => IncreCart(val.id)}
+                                                                    onClick={() => IncreCart(val.product.id)}
                                                                 >
                                                                     +
                                                                 </button>
@@ -382,7 +410,7 @@ function Cart() {
                                                         <div className="text-right">
                                                             <div className="text-sm text-gray-500 mb-1">Total Price</div>
                                                             <div className="text-2xl font-bold text-green-600">
-                                                                $ {(val.price * val.cartQty).toFixed(2)}
+                                                                $ {(val.product.price * val.cartQty).toFixed(2)}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -391,7 +419,7 @@ function Cart() {
                                                     <div className="mt-4 pt-4 border-t border-gray-100">
                                                         <button
                                                             className="w-full sm:w-auto bg-red-500 text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-red-600 transition-all cursor-pointer flex items-center justify-center gap-2"
-                                                            onClick={() => RemoveCartItem(val.id, val.brand)}
+                                                            onClick={() => RemoveCartItem(val.product.id, val.product.brand)}
                                                         >
                                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -421,8 +449,8 @@ function Cart() {
 
                             {userDetail.cart.map((val) => {
                                 return <div className='flex justify-between' key={val.id}>
-                                    <div>{val.brand} ({val.cartQty})</div>
-                                    <div>{val.price * val.cartQty}</div>
+                                    <div>{val.product.brand} ({val.cartQty})</div>
+                                    <div>{val.product.price * val.cartQty}</div>
                                 </div>
                             })}
 
@@ -436,13 +464,13 @@ function Cart() {
                         <div className="flex justify-between text-sm mb-2">
                             <span>Subtotal</span>
                             <span>${userDetail.cart.reduce((acc, val) => {
-                                return acc + val.cartQty * val.price
+                                return acc + val.cartQty * val.product.price
                             }, 0)}</span>
                         </div>
                         <div className="flex justify-between text-sm mb-2">
                             <span>Tax (10%)</span>
                             <span>{userDetail.cart.reduce((acc, val) => {
-                                const itemTotal = val.price * val.cartQty;
+                                const itemTotal = val.product.price * val.cartQty;
                                 return (acc + (itemTotal * 0.10))
                             }, 0).toFixed(2)}</span>
                         </div>

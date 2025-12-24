@@ -2,48 +2,124 @@ import axios from 'axios';
 import React, { useContext, useEffect, useState } from 'react'
 import { adminContext } from '../../Context-API/adminContext';
 import { toast } from 'react-toastify';
-function EditFormModal({ onClose, EditProduct }) {
+import api from '../../refreshFetch/api';
+function EditFormModal({ onClose, EditProductId }) {
     let { setProducts } = useContext(adminContext);
-    console.log(EditProduct);
+    let [error,setError] = useState('')
+    let[category,setCategory] = useState([])
+    console.log(EditProductId);
 
     let [ProductData, setProductData] = useState({
         id: null,
         brand: "",
-        image: "",
+        image: null,
         model: "",
-        type: "",
+        category: null,
         frame_material: "",
         quantity: 0,
         Productstatus: "",
+        in_stock:false,
         cartQty: 0,
         price: 0,
     })
 
+
     useEffect(() => {
-        if (EditProduct) {
-            setProductData({
-                id: EditProduct.id,
-                brand: EditProduct.brand,
-                image: EditProduct.image,
-                model: EditProduct.model,
-                type: EditProduct.type,
-                frame_material: EditProduct.frame_material,
-                quantity: EditProduct.quantity,
-                Productstatus: EditProduct.Productstatus,
-                cartQty: EditProduct.cartQty,
-                price: EditProduct.price,
-            });
+        async function loadCategories() {
+            const token = sessionStorage.getItem('access_token');
+            try {
+                const resp = await api.get("/admin/category/action/",{
+                    withCredentials:true,
+                    headers:{
+                        Authorization:`Bearer ${token}`
+                    }
+                });
+                setCategory(resp.data);
+            } catch (err) {
+                console.error("Category fetch error:", err);
+            }
         }
-    }, [EditProduct])
+        loadCategories();
+    }, []);
+    
+    // console.log(category);
+
+
+    useEffect(()=>{
+
+        async function ViewProductDetails(){
+            const token = sessionStorage.getItem('access_token');
+            try{
+                const resp = await api.get(`/admin/products/edit/${EditProductId}`,{
+                    withCredentials:true,
+                    headers:{
+                        Authorization:`Bearer ${token}`
+                    }
+                })
+                if(resp.status==200){
+                    console.log(resp.data);
+                    setProductData({
+                                    id: resp.data.id,
+                                    brand: resp.data.brand,
+                                    image_url: resp.data.image,
+                                    model: resp.data.model,
+                                    category: resp.data.category,
+                                    frame_material: resp.data.frame_material,
+                                    quantity: resp.data.quantity,
+                                    in_stock: resp.data.in_stock,
+                                    // cartQty: resp.data.,
+                                    price: resp.data.price,
+                                });
+
+                }
+            }catch(err){
+    
+            }
+        }
+
+        ViewProductDetails()
+
+    },[])
 
     async function PatchEdit() {
-        const resp = await axios.patch(`https://specspot-db.onrender.com/products/${ProductData.id}`, ProductData);
+        const token = sessionStorage.getItem('access_token')
+    const formData = new FormData();
 
-        setProducts((pre) => pre.map((val) => {
-            return val.id === resp.data.id ? resp.data : val
-        }))
-        onClose(false);
-        toast.warning('product edited');
+    formData.append("brand", ProductData.brand);
+    formData.append("model", ProductData.model);
+    formData.append("frame_material", ProductData.frame_material);
+    formData.append("quantity", ProductData.quantity);
+    formData.append("in_stock", ProductData.in_stock);
+    formData.append("price", ProductData.price); 
+    formData.append("category", ProductData.category);
+
+
+    // Only append if user uploaded a new image
+    if (ProductData.image) {
+        formData.append("image", ProductData.image);
+    }   
+        try{
+            const resp = await api.patch(`/admin/products/edit/${ProductData.id}/`, formData,{
+                withCredentials:true,
+                headers:{
+                    Authorization:`Bearer ${token}`
+                }
+            });
+            if(resp.status==200){
+                onClose(false);
+                toast.warning('product edited');
+            }
+        }
+        catch(err){
+            if(err.reponse){
+                const errData = err.response.data
+                if(err.status === 400){
+                    setError(errData.error)
+                }
+            }
+        }
+
+        
     }
 
 
@@ -78,14 +154,31 @@ function EditFormModal({ onClose, EditProduct }) {
 
                     {/* Image */}
                     <div>
-                        <label className="block mb-1 text-gray-700 font-medium">Image URL</label>
+                        <label className="block mb-1 text-gray-700 font-medium">Product Image</label>
+
+                        {/* Show preview */}
+                        {ProductData.image_url && (
+                            <img 
+                                src={ProductData.image_url} 
+                                alt="Product" 
+                                className="w-24 h-24 object-cover mb-2 rounded-md border"
+                            />
+                        )}
+
+                        {/* File input */}
                         <input
-                            type="text"
-                            placeholder="Enter image URL"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            value={ProductData.image}
-                            onChange={(e) => setProductData({ ...ProductData, image: e.target.value })} />
+                            type="file"
+                            accept="image/*"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                            onChange={(e) =>
+                                setProductData({
+                                    ...ProductData,
+                                    image: e.target.files[0] // store actual file
+                                })
+                            }
+                        />
                     </div>
+
 
                     {/* Model */}
                     <div>
@@ -94,19 +187,26 @@ function EditFormModal({ onClose, EditProduct }) {
                             type="text"
                             placeholder="Enter model name"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            value={EditProduct.model}
+                            value={ProductData.model}
                             onChange={(e) => setProductData({ ...ProductData, model: e.target.value })} />
                     </div>
 
                     {/* Type */}
                     <div>
-                        <label className="block mb-1 text-gray-700 font-medium">Type</label>
-                        <input
-                            type="text"
-                            placeholder="Enter type"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            value={ProductData.type}
-                            onChange={(e) => setProductData({ ...ProductData, type: e.target.value })} />
+                    <select
+                        value={ProductData.category || ""}
+                        onChange={(e) =>
+                            setProductData({ ...ProductData, category: e.target.value })
+                        }
+                        >
+                        <option value="">Select category</option>
+                        {category.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                            {cat.category}
+                            </option>
+                    ))}
+                    </select>
+
                     </div>
 
                     {/* Frame Material */}
@@ -134,14 +234,22 @@ function EditFormModal({ onClose, EditProduct }) {
                     {/* Product Status */}
                     <div>
                         <label className="block mb-1 text-gray-700 font-medium">Product Status</label>
-                        <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            value={ProductData.Productstatus}
-                            onChange={(e) => setProductData({ ...ProductData, Productstatus: e.target.value })}>
-                            <option value="available">Active</option>
-                            <option value="out-of-stock">Inactive</option>
 
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            value={ProductData.in_stock ? "available" : "out-of-stock"}
+                            onChange={(e) =>
+                                setProductData({
+                                    ...ProductData,
+                                    in_stock: e.target.value === "available"
+                                })
+                            }
+                        >
+                            <option value="available">In-Stock</option>
+                            <option value="out-of-stock">Stock-out</option>
                         </select>
                     </div>
+
 
                     {/* Cart Qty */}
                     <div>
@@ -182,6 +290,7 @@ function EditFormModal({ onClose, EditProduct }) {
                     </button>
                 </div>
             </div>
+            <div>{error}</div>
         </div>
     )
 }

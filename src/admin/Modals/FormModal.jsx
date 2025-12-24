@@ -14,6 +14,7 @@ import {
 import axios from 'axios';
 import { data } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import api from '../../refreshFetch/api';
 
 function reducerFun(prev, action) {
     switch (action.type) {
@@ -31,10 +32,10 @@ function reducerFun(prev, action) {
                 ...prev,
                 model: action.payLoad
             }
-        case 'get-type':
+        case 'get-category':
             return {
                 ...prev,
-                type: action.payLoad
+                category: action.payLoad
             }
 
         case 'get-frame':
@@ -64,7 +65,7 @@ function reducerFun(prev, action) {
             return {
                 brand: '',
                 model: '',
-                type: '',
+                category: '',
                 frame: '',
                 price: '',
                 stock: '',
@@ -77,27 +78,53 @@ function FormModal({ onClose, Edit }) {
 
     let [state, dispatch] = useReducer(reducerFun, {});
     let [error, setError] = useState('');
+    let[category,setCategory]=useState([])
     const { setProducts, products } = useContext(adminContext);
+    const token = sessionStorage.getItem('access_token');
+
+    useEffect(() => {
+        async function loadCategories() {
+            try {
+                const resp = await api.get("/admin/category/action/",{
+                    withCredentials:true,
+                    headers:{
+                        Authorization:`Bearer ${token}`
+                    }
+                });
+                setCategory(resp.data);
+            } catch (err) {
+                console.error("Category fetch error:", err);
+            }
+        }
+        loadCategories();
+    }, []);
+
+    console.log(category);
 
 
 
     async function InsertNewProduct() {
 
 
-        if (state.brand && state.image && state.model && state.type && state.frame && state.stock && state.price !== '') {
-            await axios.get('https://specspot-db.onrender.com/products');
+        if (state.brand && state.image && state.model && state.category && state.frame && state.stock && state.price !== '') {
+            // await axios.get('https://specspot-db.onrender.com/products');
 
-            const resp = await axios.post('https://specspot-db.onrender.com/products', {
+        const formData = new FormData();
+        formData.append("brand", state.brand);
+        formData.append("model", state.model);
+        formData.append("category", state.category);   // ID of category
+        formData.append("frame_material", state.frame);
+        formData.append("quantity", state.stock);
+        formData.append("price", state.price);
+        formData.append("image", state.image); 
+        formData.append("in_stock",true); 
 
-                brand: state.brand,
-                image: state.image,
-                model: state.model,
-                type: state.type,
-                frame_material: state.frame,
-                quantity: state.stock,
-                Productstatus: "available",
-                cartQty: 1,
-                price: state.price
+            const resp = await api.post('/admin/products/add/', 
+                formData,{
+                withCredentials:true,
+                headers:{
+                    Authorization:`Bearer ${token}`
+                }
             })
             setProducts(pre => [...pre, resp.data])
             onClose(false)
@@ -133,23 +160,7 @@ function FormModal({ onClose, Edit }) {
                 {/* Form */}
                 <form className="grid grid-cols-1 md:grid-cols-2 gap-5 p-6">
                     {/* Product Name */}
-                    {/* <div>
-                        <label className="block mb-1 text-gray-700 font-medium">
-                            Id
-                        </label>
-                        <div className="relative">
-                            <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                            <input
-                                type="text"
-                                placeholder="Enter Id"
-                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                value={state.id}
-                                onChange={(e) => dispatch({
-                                    type: 'get-Id',
-                                    payLoad: e.target.value
-                                })} />
-                        </div>
-                    </div> */}
+                    
 
                     <div>
                         <label className="block mb-1 text-gray-700 font-medium">
@@ -191,21 +202,31 @@ function FormModal({ onClose, Edit }) {
                     {/* Category */}
                     <div>
                         <label className="block mb-1 text-gray-700 font-medium">
-                            Type
+                            Category
                         </label>
                         <div className="relative">
                             <Layers className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                            <input
-                                type="text"
-                                placeholder="Enter Type"
-                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                value={state.type}
-                                onChange={(e) => dispatch({
-                                    type: 'get-type',
-                                    payLoad: e.target.value
-                                })} />
+
+                            <select
+                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                                value={state.category}
+                                onChange={(e) =>
+                                    dispatch({
+                                        type: "get-category",
+                                        payLoad: e.target.value
+                                    })
+                                }
+                            >
+                                <option value="">-- Select Category --</option>
+                                {category.map((cat) => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.category}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
+
 
                     <div>
                         <label className="block mb-1 text-gray-700 font-medium">
@@ -264,39 +285,23 @@ function FormModal({ onClose, Edit }) {
                     </div>
 
                     {/* Description (full width)
-                    <div className="md:col-span-2">
-                        <label className="block mb-1 text-gray-700 font-medium">
-                            Description
-                        </label>
-                        <div className="relative">
-                            <FileText className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-                            <textarea
-                                placeholder="Enter product description"
-                                rows={3}
-                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                onChange={(e) => dispatch({
-                                    type: 'get-discription',
-                                    payLoad: e.target.value
-                                })} ></textarea>
-                        </div>
-                    </div> */}
 
                     {/* Image URL */}
                     <div className="md:col-span-2">
                         <label className="block mb-1 text-gray-700 font-medium">
-                            Image URL
+                            Upload Image
                         </label>
                         <div className="relative">
                             <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input
-                                type="url"
-                                placeholder="Enter image link"
-                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                value={state.image}
+                                type="file"
+                                accept="image/*"
+                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg"
                                 onChange={(e) => dispatch({
-                                    type: 'get-image',
-                                    payLoad: e.target.value
-                                })} />
+                                    type: "get-image",
+                                    payLoad: e.target.files[0]   // <-- store actual file object
+                                })}
+                            />
                         </div>
                     </div>
 

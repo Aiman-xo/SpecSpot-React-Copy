@@ -2,11 +2,15 @@ import axios from 'axios';
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../Reusables/navbar';
+// import { authFetch } from '../refreshFetch/authFetch';
+import api from '../refreshFetch/api';
 import { toast } from 'react-toastify';
 
 function Profile() {
     let [userProfile, setUserProfile] = useState([]);
     let [profileLoading, setProfileLoading] = useState(false);
+    let [userorders,setUserOrders] = useState([]);
+    let [products,SetProducts] = useState([]);  
     // let [orders, setOrders] = useState([]);
     const [showModal, setShowModal] = useState(false);
     let [orderId, setOrderId] = useState();
@@ -19,50 +23,110 @@ function Profile() {
     };
 
     useEffect(() => {
-        setProfileLoading(true);
-        setTimeout(() => {
-            setProfileLoading(false);
-        }, 2000)
-        const userId = localStorage.getItem("userId");
-
-        async function userProfile() {
-            const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-            const data = await resp.data;
-
-            setUserProfile(data);
+        async function loadProfile() {
+            setProfileLoading(true);
+    
+            try {
+                const data = await api.get(
+                    "/profile/"
+                );
+    
+                setUserProfile(data.data);
+    
+            } catch (error) {
+                console.error("Failed to load profile:", error);
+                toast.error("Please login first");
+                navigate("/login");
+    
+            } finally {
+                setProfileLoading(false);
+            }
         }
-        userProfile();
-    }, [])
+    
+        loadProfile();
+    }, []);
 
-    function LogOut() {
-        localStorage.removeItem("userId");
-        localStorage.removeItem("role");
-        // alert('loggin out....')
-        toast.warning('logging out...')
-        nav('/login')
+    useEffect(()=>{
+        async function GetOrders(){
+            try {
+                const data = await api.get(
+                    "/orders/"
+                );
+    
+                setUserOrders(data.data);  // store full list
+                console.log(userorders);
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        
+        GetOrders()
+    },[]);
+    console.log(userorders);
+    userorders.map((val)=>{
+        console.log(val.items) 
+    })
+
+    async function LogOut() {
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+            toast.warning('Please login first');
+            nav('/login');
+            return;
+        }
+
+        try {
+            // Call backend logout endpoint to clear refresh token
+            await axios.post('https://specspot.duckdns.org/api/v1/user/logout/', {}, {
+                withCredentials: true // Important for cookie-based logout
+            });
+        } catch (error) {
+            console.log('Logout API call completed');
+        } finally {
+            // Clear all frontend storage
+            localStorage.removeItem("userId");
+            localStorage.removeItem("role");
+            localStorage.removeItem("status");
+            localStorage.removeItem("userName");
+            localStorage.removeItem("adminId");
+
+            sessionStorage.removeItem('access_token');
+            // Reset states
+            // setShowLogin(true); // Show login options again
+
+            toast.success('Logged out successfully!');
+            nav('/login');
+        }
     }
     // console.log(userProfile?.orders?.products)
 
-    async function CancelOrder(OrderID) {
-        setShowModal(false)
-        toast.error('order cancelled');
-        const userId = localStorage.getItem("userId");
-        const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-        const data = resp.data;
-
-
-        const updatedOrders = data.orders?.map((item) => {
-            return item?.id === OrderID ? { ...item, orderStatus: "cancelled" } : item
-        })
-
-        await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-            orders: updatedOrders
-        })
-
-        setUserProfile({ ...data, orders: updatedOrders });
-
-
+    async function CancelOrder(orderId) {
+        try {
+            setShowModal(false);
+    
+            // Call backend DELETE
+            await api.delete(
+                `/delete-order/${orderId}/`
+            );
+    
+            toast.error("Order cancelled");
+    
+            // Update orders in frontend state
+            setUserOrders(prev =>
+                prev.map(order =>
+                    order.id === orderId
+                        ? { ...order, order_status: "cancelled" }
+                        : order
+                )
+            );
+            
+    
+        } catch (error) {
+            console.log("Cancel order failed:", error);
+            toast.error("Could not cancel order");
+        }
     }
+    
     function showConfirmation(orderId) {
         setOrderId(orderId);
         setShowModal(true)
@@ -111,7 +175,7 @@ function Profile() {
                     {/* User Info */}
                     <h2 className="text-3xl font-semibold text-rose-900 mb-2">{userProfile.name}</h2>
                     <p className="text-rose-900 opacity-90 text-base mb-1">{userProfile.email}</p>
-                    <p className="uppercase font-semibold tracking-widest text-rose-900 text-sm mb-6">{userProfile.role}</p>
+                    <p className="uppercase font-semibold tracking-widest text-rose-900 text-sm mb-6">{userProfile.is_staff?'Admin':'user'}</p>
 
                     {/* Logout Button */}
                     <button
@@ -129,11 +193,11 @@ function Profile() {
                 <div>
                     <h3 className="text-2xl font-bold text-gray-800 text-center mb-6">Your Orders</h3>
 
-                    {userProfile?.orders?.length === 0 ? (
+                    {userorders.length === 0 ? (
                         <div className="text-center py-14 text-red-600 font-medium text-lg">No Orders Found!</div>
                     ) : (
                         <div className="space-y-10">
-                            {userProfile?.orders?.map((val) => (
+                            {userorders.map((val) => (
                                 <article
                                     key={val.id}
                                     className="bg-white shadow-lg rounded-2xl overflow-hidden hover:shadow-2xl transition duration-300"
@@ -152,21 +216,21 @@ function Profile() {
                                     >
                                         <div>
                                             <h4 className="text-lg font-semibold text-gray-800">Order #{val.id}</h4>
-                                            <p className="text-gray-500 text-sm">{val.date}</p>
+                                            <p className="text-gray-500 text-sm">{val.created_at}</p>
                                         </div>
                                         <span
-                                            className={`mt-3 md:mt-0 px-5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors ${val.orderStatus === "pending"
+                                            className={`mt-3 md:mt-0 px-5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1 transition-colors ${val.order_status === "pending"
                                                 ? "bg-yellow-100 text-yellow-800"
-                                                : val.orderStatus === "shipped"
+                                                : val.order_status === "shipped"
                                                     ? "bg-blue-100 text-blue-800"
-                                                    : val.orderStatus === "delivered"
+                                                    : val.order_status === "delivered"
                                                         ? "bg-green-100 text-green-800"
-                                                        : val.orderStatus === "cancelled"
+                                                        : val.order_status === "cancelled"
                                                             ? "bg-red-100 text-red-800"
                                                             : "bg-gray-100 text-gray-700"
                                                 }`}
                                         >
-                                            {val.orderStatus}
+                                            {val.order_status}
                                         </span>
                                     </header>
 
@@ -192,16 +256,16 @@ function Profile() {
                                             <div>
                                                 <h5 className="font-semibold text-gray-700 mb-5">Items Ordered</h5>
                                                 <div className="space-y-5">
-                                                    {val.products.map((item) => (
-                                                        <div key={item.id} className="flex items-center gap-6 bg-gray-50 p-4 rounded-lg shadow-sm">
+                                                    {val.items.map((item) => (
+                                                        <div key={item.product.id} className="flex items-center gap-6 bg-gray-50 p-4 rounded-lg shadow-sm">
                                                             <img
-                                                                src={item.image}
-                                                                alt={`${item.brand} product`}
+                                                                src={item.product.image}
+                                                                alt={`${item.product.brand} product`}
                                                                 className="w-24 h-20 object-cover rounded-lg border border-gray-200"
                                                             />
                                                             <div className="flex-1">
-                                                                <p className="font-semibold text-gray-800">{item.brand}</p>
-                                                                <p className="text-gray-600 text-sm mt-1">Qty: {item.cartQty}</p>
+                                                                <p className="font-semibold text-gray-800">{item.product.brand}</p>
+                                                                <p className="text-gray-600 text-sm mt-1">Qty: {item.qty}</p>
                                                             </div>
                                                             <p className="font-bold text-indigo-600">${item.price}</p>
                                                         </div>
@@ -215,15 +279,17 @@ function Profile() {
                                     <div className="flex justify-between items-center px-8 py-6 bg-gray-50 font-semibold text-gray-900">
                                         <span>Total (incl. Tax & Shipping)</span>
                                         <span>
-                                            ${val.products.reduce((acc, item) => {
-                                                const itemsTotal = item.price * item.cartQty;
+                                            {/* ${val.items.reduce((acc, item) => {
+                                                const itemsTotal = item.price * item.qty;
                                                 return acc + itemsTotal + itemsTotal * 0.1 + 10;
-                                            }, 0).toFixed(2)}
+                                            }, 0).toFixed(2)} */}
+                                            
+                                            $ {val.total_amount + val.total_amount * 0.1 + 10}
                                         </span>
                                     </div>
 
                                     {/* Cancel Button */}
-                                    {val.orderStatus !== "cancelled" && (
+                                    {val.order_status !== "cancelled" && (
                                         <div className="flex justify-end px-8 py-6 bg-white">
                                             <button
                                                 className="bg-red-500 px-6 py-2 rounded-lg text-white text-sm font-medium hover:bg-red-600 transition cursor-pointer"

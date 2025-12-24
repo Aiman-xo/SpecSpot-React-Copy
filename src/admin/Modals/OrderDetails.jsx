@@ -14,10 +14,10 @@ function OrderDetails({ onClose, OrderObj }) {
                             <Package className="w-6 h-6" /> Order #{OrderObj.id}
                         </h2>
                         <p className="flex items-center gap-2 text-gray-200">
-                            <Calendar className="w-4 h-4" />{OrderObj.date}
+                            <Calendar className="w-4 h-4" />{OrderObj.created_at}
                         </p>
                         <p className="flex items-center gap-2 text-gray-200">
-                            Customer: {OrderObj.userName}
+                            Customer: {OrderObj.username}
                         </p>
                     </div>
                     <button
@@ -46,8 +46,8 @@ function OrderDetails({ onClose, OrderObj }) {
                             <p className="col-span-2 flex items-center gap-2">
                                 <MapPin className="w-4 h-4 text-red-500" /> {OrderObj.shipping.country}
                             </p>
-                            <span className={`mt-2 inline-block px-3 py-2 rounded-full text-xs font-medium w-20 text-center ${OrderObj.orderStatus === "pending" ? "bg-yellow-100 text-yellow-700" : OrderObj.orderStatus === "shipped" ? "bg-blue-100 text-blue-700" :
-                                OrderObj.orderStatus === "delivered" ? "bg-green-100 text-green-700" : OrderObj.orderStatus === "cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>{OrderObj.orderStatus}</span>
+                            <span className={`mt-2 inline-block px-3 py-2 rounded-full text-xs font-medium w-20 text-center ${OrderObj.order_status === "pending" ? "bg-yellow-100 text-yellow-700" : OrderObj.order_status === "shipped" ? "bg-blue-100 text-blue-700" :
+                                OrderObj.order_status === "delivered" ? "bg-green-100 text-green-700" : OrderObj.order_status === "cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>{OrderObj.order_status}</span>
                         </div>
                     </div>
 
@@ -60,17 +60,17 @@ function OrderDetails({ onClose, OrderObj }) {
                         {/* Product 1 */}
 
                         {
-                            OrderObj.products.map((val) => {
+                            OrderObj.items.map((val) => {
                                 return <div className="flex items-center justify-between pb-4 mb-4">
                                     <div className="flex items-center gap-4">
                                         <img
-                                            src={val.image}
-                                            alt={val.brand}
+                                            src={val.product.image}
+                                            alt={val.product.brand}
                                             className="w-30 h-20 object-cover rounded-xl shadow-md"
                                         />
                                         <div>
-                                            <h4 className="font-semibold">{val.brand}</h4>
-                                            <p className="text-sm text-gray-500">{val.cartQty}</p>
+                                            <h4 className="font-semibold text-sm">Brand: {val.product.brand}</h4>
+                                            <p className="text-sm text-gray-500">quantity: {val.qty}</p>
                                         </div>
                                     </div>
                                     <p className="font-bold text-blue-600 flex items-center gap-1">
@@ -92,7 +92,7 @@ function OrderDetails({ onClose, OrderObj }) {
                     </button> */}
                     <div className="text-right">
                         <h3 className="text-lg font-semibold me-4">Total Amount</h3>
-                        <p className="text-2xl font-bold text-green-600 me-4">{OrderObj.products.reduce((acc, val) => acc += val.price * val.cartQty, 0)}</p>
+                        <p className="text-2xl font-bold text-green-600 me-4">{OrderObj.total_amount}</p>
                     </div>
                 </div>
             </div>

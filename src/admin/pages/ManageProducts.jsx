@@ -4,17 +4,21 @@ import { Pencil, Trash, Check, X, Plus, Package, Search, ChevronLeft, ChevronRig
 import FormModal from '../Modals/FormModal';
 import { adminContext } from '../../Context-API/adminContext';
 import EditFormModal from '../Modals/EditFormModal';
+import CategoryModal from '../Modals/CategoryModal';
 import { toast } from 'react-toastify';
 import Api from '../api/api';
+import api from '../../refreshFetch/api';
+import { useNavigate } from 'react-router-dom';
 
 
 function ManageProducts() {
     // let [products, setProducts] = useState([]);
-    const { setProducts, products } = useContext(adminContext);
+    const { setProducts, products ,setDashboardTotalProducts} = useContext(adminContext);
     let [searchValue, setSearchValue] = useState("");
     let [notfound, setNotfound] = useState('');
     let [flag, setFlag] = useState(false);
     let [form, setForm] = useState(false);
+    let [categoryform, setCategoryForm] = useState(false);
     let [selectEdit, setSelectEdit] = useState(null);
     let [editform, setEditForm] = useState(false);
     let [showDeleteModal, setshowDeleteModal] = useState(false);
@@ -22,81 +26,72 @@ function ManageProducts() {
     let [numTotalProducts, setNumTotalProducts] = useState(0);
     let [currentPage, setCurrentPage] = useState(1);
     let { products1, users } = Api();
+    let nav =useNavigate()
 
+    const totalPages = Math.ceil(numTotalProducts / 5);
 
-    let itemsPerPage = 5;
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const totalPages = Math.ceil(products.length / itemsPerPage);
-    const slicedPage = products.slice(startIndex, endIndex);
+    
+    
 
     useEffect(() => {
         async function GetProducts() {
-            const resp = await axios.get(products1);
-            const data = resp.data;
-            setProducts(data);
-            setNumTotalProducts(data.length);
+            try {
+                const token = sessionStorage.getItem("access_token");
+    
+                const resp = await api.get(`${products1}?page=${currentPage}&search=${searchValue}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    withCredentials: true
+                });
+    
+                const data = resp.data;
+    
+                setProducts(data.results);      // products only for this page
+                setNumTotalProducts(data.count); // total count from backend
 
-            setNotfound('');
-            if (searchValue.trim() !== '') {
+                if (data.count === 0) {
+                    setNotfound("No products found!");
+                } else {
+                    setNotfound("");
+                }
+    
+            } catch (err) {
+                if (err.response?.status === 401) {
+                    sessionStorage.removeItem("access_token");
+                    nav("/login");
+                }else{
 
-                const filtered = data.filter((val) => {
-                    return (val.brand.toLowerCase().includes(searchValue.toLowerCase()) ||
-                        val.id == Number(searchValue)
-                    )
-
-
-
-                })
-                setProducts(filtered);
-
-                if (filtered.length === 0) {
-                    setNotfound('No Products Availabe!')
+                    console.error("Get Products Error:", err);
                 }
             }
+        }
+    
+        GetProducts();
+    }, [currentPage, flag,searchValue]);
+    setDashboardTotalProducts(numTotalProducts);
 
+
+    
+    async function DeleteProduct(ProductId) {
+        const token = sessionStorage.getItem('access_token')
+        setshowDeleteModal(false)
+
+        const resp = await api.delete(`/admin/products/delete/${ProductId}/`,{
+            withCredentials:true,
+            headers:{
+                Authorization:`Bearer ${token}`
+            }
+        })
+        setFlag(pre => !pre)
+        if (resp.status==200){
+            toast.error('Product Deleted');
 
         }
-        GetProducts()
-    }, [flag, searchValue]);
-
-
-    async function StatusInactive(ProductId) {
-        await axios.get(`${products1}/${ProductId}`);
-
-
-        await axios.patch(`${products1}/${ProductId}`, {
-            Productstatus: "out-of-stock"
-        })
-        setFlag(pre => !pre)
-
-    }
-
-    async function StatusActive(ProductId) {
-        await axios.get(`${products1}/${ProductId}`);
-
-
-        await axios.patch(`${products1}/${ProductId}`, {
-            Productstatus: "available"
-        })
-        setFlag(pre => !pre)
-
-    }
-
-    async function DeleteProduct(ProductId) {
-        setshowDeleteModal(false)
-        await axios.get(`${products1}/${ProductId}`);
-
-
-        await axios.delete(`${products1}/${ProductId}`)
-        setFlag(pre => !pre)
-        toast.error('Product Deleted');
 
     }
 
 
-    function FormEditing(productObject) {
-        setSelectEdit(productObject);
+    function FormEditing(productId) {
+        setSelectEdit(productId);
         setEditForm(true);
 
     }
@@ -106,11 +101,11 @@ function ManageProducts() {
         setDeleteId(deleteId);
 
     }
-    // console.log(selectEdit);
     return (
         <div className='  rounded-xl'>
             {form && <FormModal onClose={setForm} />}
-            {editform && <EditFormModal onClose={setEditForm} EditProduct={selectEdit} />}
+            {editform && <EditFormModal onClose={setEditForm} EditProductId={selectEdit} />}
+            {categoryform&& <CategoryModal  onClose={setCategoryForm}/>}
 
             <div className="min-h-screen bg-gray-50 p-6">
                 <div className="max-w-7xl mx-auto">
@@ -138,28 +133,56 @@ function ManageProducts() {
                     {/* Search and Actions */}
                     <div className="mb-8">
                         <div className="bg-gray-50 rounded-lg p-10">
-                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                                <div className="flex-1 max-w-md">
+
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 w-full">
+
+                                {/* LEFT → Search Bar */}
+                                <div className="w-full sm:w-1/2 max-w-md">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                                         <input
                                             type="text"
                                             placeholder="Search products..."
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:shadow-md transition-shadow"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg shadow-sm
+                                                    focus:outline-none focus:ring-2 focus:ring-blue-500
+                                                    focus:shadow-md transition-shadow"
                                             onChange={(e) => setSearchValue(e.target.value)}
                                         />
                                     </div>
                                 </div>
-                                <button
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md hover:shadow-lg transition-all font-medium cursor-pointer"
-                                    onClick={() => setForm(true)}
-                                >
-                                    <Plus size={18} />
-                                    Add Products
-                                </button>
+
+                                {/* RIGHT → Buttons stacked vertically */}
+                                <div className="flex flex-col gap-3 items-end">
+
+                                    <button
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg
+                                                hover:bg-blue-700 shadow-md hover:shadow-lg transition-all
+                                                font-medium cursor-pointer"
+                                        onClick={() => setForm(true)}
+                                    >
+                                        <Plus size={18} />
+                                        Add Products
+                                    </button>
+
+                                    <button
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg
+                                                hover:bg-green-700 shadow-md hover:shadow-lg transition-all
+                                                font-medium cursor-pointer"
+                                        onClick={() => setCategoryForm(true)}
+                                    >
+                                        <Plus size={18} />
+                                        Add Category
+                                    </button>
+
+                                </div>
+
                             </div>
+
                         </div>
                     </div>
+
+
+
 
                     {/* Table Section */}
                     <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -194,7 +217,7 @@ function ManageProducts() {
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {slicedPage.map((product) => (
+                                    {products.map((product) => (
                                         <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 #{product.id}
@@ -211,7 +234,7 @@ function ManageProducts() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-sm text-xs font-medium bg-gray-100 text-gray-800 shadow-sm">
-                                                    {product.type}
+                                                    {product.category_name}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
@@ -229,19 +252,19 @@ function ManageProducts() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span
-                                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shadow-sm ${product.Productstatus === "available"
+                                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shadow-sm ${product.in_stock
                                                         ? "bg-green-100 text-green-800"
                                                         : "bg-red-100 text-red-800"
                                                         }`}
                                                 >
-                                                    {product.Productstatus}
+                                                    {product.in_stock ? 'Available':'out-of-stock'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center justify-center space-x-2">
                                                     <button
                                                         className="inline-flex items-center justify-center w-8 h-8 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 shadow-md hover:shadow-lg transition-all cursor-pointer"
-                                                        onClick={() => FormEditing(product)}
+                                                        onClick={() => FormEditing(product.id)}
                                                         title="Edit"
                                                     >
                                                         <Pencil size={16} />
@@ -254,24 +277,6 @@ function ManageProducts() {
                                                     >
                                                         <Trash size={16} />
                                                     </button>
-
-                                                    {product.Productstatus === "available" ? (
-                                                        <button
-                                                            className="inline-flex items-center justify-center w-8 h-8 bg-orange-500 text-white rounded-lg hover:bg-orange-600 shadow-md hover:shadow-lg transition-all cursor-pointer"
-                                                            onClick={() => StatusInactive(product.id)}
-                                                            title="Deactivate"
-                                                        >
-                                                            <X size={16} />
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            className="inline-flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-lg hover:bg-green-600 shadow-md hover:shadow-lg transition-all cursor-pointer"
-                                                            onClick={() => StatusActive(product.id)}
-                                                            title="Activate"
-                                                        >
-                                                            <Check size={16} />
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -284,29 +289,29 @@ function ManageProducts() {
 
                     </div>
 
-                    <div className="flex items-center justify-center space-x-4 mt-8">
+                    {!notfound&&<div className="flex items-center justify-center space-x-4 mt-8">
 
                         <button
-                            className="flex items-center gap-2 px-3 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-50 shadow-md hover:shadow-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-xs"
-                            onClick={() => setCurrentPage(pre => Math.max(pre - 1, 1))}
+                            className="flex items-center gap-2 px-3 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-50 shadow-md transition font-medium cursor-pointer"
+                            onClick={() => setCurrentPage((pre) => Math.max(pre - 1, 1))}
                             disabled={currentPage === 1}
                         >
-                            <ChevronLeft size={18} />
-                            Previous
+                            <ChevronLeft size={18} /> Previous
                         </button>
-                        <span className="px-3 py-1 border border-gray-300 rounded font-bold opacity-100">
-                            {currentPage}
+
+                        <span className="px-3 py-1 border border-gray-300 rounded font-bold">
+                            Page {currentPage} / {totalPages}
                         </span>
 
                         <button
-                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md hover:shadow-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-xs"
-                            onClick={() => setCurrentPage(pre => Math.min(pre + 1, totalPages))}
+                            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition font-medium cursor-pointer"
+                            onClick={() => setCurrentPage((pre) => Math.min(pre + 1, totalPages))}
                             disabled={currentPage === totalPages}
                         >
-                            Next
-                            <ChevronRight size={18} />
+                            Next <ChevronRight size={18} />
                         </button>
-                    </div>
+                    </div>}
+
 
                     {/* Not Found Message */}
                     {notfound && (

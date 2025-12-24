@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react'
-import { Lock, Unlock } from "lucide-react";
+import React, { use, useContext, useEffect, useState } from 'react'
+import { Lock, Truck, Unlock } from "lucide-react";
 import axios from 'axios';
 import Api from '../api/api';
+import { adminContext } from '../../Context-API/adminContext';
+import { useNavigate } from 'react-router-dom';
+import api from '../../refreshFetch/api';
 
 function Users() {
     let [users, setUsers] = useState([]);
@@ -14,51 +17,65 @@ function Users() {
     let [userId, setUserId] = useState();
     let [state, setState] = useState([]);
     let { products1, users1 } = Api();
+    let{setTotalUsers,total_users}=useContext(adminContext);
+    let nav = useNavigate()
 
     //show number of blocked users
-    const BolckedUsers = state.filter((val) => val.status === "Inactive");
-    console.log(BolckedUsers.length);
+    // const BolckedUsers = state.filter((val) => val.status === "Inactive");
+    // console.log(BolckedUsers.length);
+    const token = sessionStorage.getItem('access_token');
+    
+    // console.log(token);
     useEffect(() => {
         async function GetUsers() {
-            const resp = await axios.get(users1);
-            const data = await resp.data;
-            setState(data)
+    
+            try {
+                const resp = await api.get(
+                    `${users1}?search=${encodeURIComponent(searchValue)}&status=${sortStatus}`, 
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+    
+                const data = resp.data.result;
+                setState(data);
+                setTotalUsers(resp.data.total_users);
+    
+                if (data.length === 0) {
+                    setNotfound("No users found!");
+                } else {
+                    setNotfound("");
+                }
+            } catch (err) {
+                if (err.response?.status === 401) {
+                    sessionStorage.removeItem("access_token");
+                    nav("/login");
+                }else{
 
-            let filtered = data;
-
-            if (searchValue.trim() !== '') {
-                filtered = filtered.filter((val) => {
-                    return val.name.toLowerCase().includes(searchValue.toLowerCase())
-                })
+                    console.error("Get users error:", err);
+                }
             }
-
-            //sort based on status
-
-            if (sortStatus !== "all") {
-
-                filtered = filtered.filter((val) => {
-                    return val.status === sortStatus
-                })
-            }
-            setUsers(filtered);
-            if (filtered.length === 0) {
-                setNotfound("No users Found!");
-            } else {
-                setNotfound("")
-            }
-
         }
-        GetUsers()
-    }, [searchValue, flag, sortStatus])
+    
+        GetUsers();
+    }, [searchValue, flag,sortStatus]);
 
+    // console.log(total_users);
+    
 
+    console.log(state);
     async function SetBlock(userId) {
-
+        const token = sessionStorage.getItem('access_token');
         setShowBlockModal(false)
         // const Activate = setstatus === "Active" ? "Inactive" : "Active"
 
-        await axios.patch(`${users1}/${userId}`, {
-            status: "Inactive"
+        await api.post(`/admin/users/action/${userId}/`,{},{
+            withCredentials:true,
+            headers:{
+                Authorization: `Bearer ${token}`
+            }
         })
         setFlag(pre => !pre)
     }
@@ -67,8 +84,11 @@ function Users() {
         setShowunBlockModal(false);
         // const Activate = setstatus === "Active" ? "Inactive" : "Active"
 
-        await axios.patch(`${users1}/${userId}`, {
-            status: "Active"
+        await api.post(`/admin/users/action/${userId}/`,{},{
+            withCredentials:true,
+            headers:{
+                Authorization: `Bearer ${token}`
+            }
         })
         setFlag(pre => !pre)
     }
@@ -133,30 +153,30 @@ function Users() {
                     </thead>
 
                     <tbody className="bg-white divide-y divide-gray-100">
-                        {users.map(
+                        {state.map(
                             (user, index) =>
-                                user.role === "user" && (
+                                user && (
                                     <tr key={user.id} className="hover:bg-gray-50 transition-shadow shadow-sm rounded-lg">
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-700">{index}</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-700">{index+1}</td>
                                         <td className="px-6 py-4 text-sm font-medium text-gray-700">{user.id}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{user.name}</td>
                                         <td className="px-6 py-4 text-sm text-gray-500">{user.email}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">{user.orders.length}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">{user.total_orders}</td>
                                         <td className="px-6 py-4 text-sm text-gray-500">
-                                            {user.orders.reduce((acc, val) => acc + val.products.length, 0)}
+                                            {user.total_products}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span
-                                                className={`px-3 py-1 rounded-full text-xs font-medium ${user.status === "Active"
+                                                className={`px-3 py-1 rounded-full text-xs font-medium ${user.is_active === true
                                                         ? "bg-green-100 text-green-700"
                                                         : "bg-red-100 text-red-700"
                                                     }`}
                                             >
-                                                {user.status}
+                                                {user.is_active?'Active':'Blocked'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-center">
-                                            {user.status === "Active" ? (
+                                            {user.is_active === true ? (
                                                 <button
                                                     className="flex items-center gap-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition text-sm cursor-pointer"
                                                     onClick={() => ShowConfirmationBlock(user.id)}

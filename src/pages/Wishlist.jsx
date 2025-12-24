@@ -3,67 +3,113 @@ import React, { useContext, useEffect, useState } from 'react'
 import Navbar from '../Reusables/navbar';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+// import { authFetch } from '../refreshFetch/authFetch';
 import { searchContext } from '../Context-API/context';
+import api from '../refreshFetch/api';
 
 function Wishlist() {
     let [loading, setLoading] = useState(false);
-
+    let nav = useNavigate()
+    let {setWishlistLength,Wishlength,setCartLength} =useContext(searchContext)
 
 
     const userId = localStorage.getItem("userId")
 
     let [wishlistItem, setWishlistItem] = useState([]);
-    const { setCartLength, setWishlistLength } = useContext(searchContext);
+    // const { setCartLength, setWishlistLength } = useContext(searchContext);
 
     useEffect(() => {
+        setLoading(true);
 
-        async function wish() {
-            setLoading(true);
-            setTimeout(() => {
+        async function getWishlist() {
+            try {
+                const data = await api.get(
+                    "/wishlist/"
+                );
+                // console.log(data);
+
+                // data is an array of wishlist items
+                setWishlistItem(data.data);
+            } catch (error) {
+                console.error("Failed to load wishlist", error);
+                toast.error("Please login first");
+                nav("/login");
+            } finally {
                 setLoading(false);
-            }, 2000)
-            const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-            const data = await resp.data;
-            setWishlistItem(data.wishlist);
+            }
         }
-        wish()
-    }, [])
-    async function RemoveWishlist(WishId, Brand) {
-        const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-        const data = await resp.data;
-        // setWishlistItem(data.wishlist)
+        console.log(wishlistItem);
+        getWishlist();
+    }, []);
+    useEffect(() => {
+        console.log("Wishlist item updated:", wishlistItem);
+    }, [wishlistItem]);
 
-        const filtered = data.wishlist.filter((val) => {
-            return val.id !== WishId;
-        })
-        await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-            wishlist: filtered
-        })
-        setWishlistItem(filtered)
-        setWishlistLength(data.wishlist.length - 1)
-        toast.error(`${Brand} removed from wishlist`)
+    async function RemoveWishlist(productId, brand) {
+        const access = sessionStorage.getItem("access_token");
+    
+        if (!access) {
+            toast.warning("Please login first");
+            navigate("/login");
+            return;
+        }
+    
+        try {
+            // Backend DELETE request
+            await api.delete(
+                `/wishlist/${productId}/`
+            );
+    
+            // Update UI state
+            setWishlistItem(prev =>
+                prev.filter(item => item.product.id !== productId)
+            );
+    
+            setWishlistLength(prev => prev - 1);
+    
+            toast.error(`${brand} removed from wishlist`);
+    
+        } catch (error) {
+            console.error("Wishlist delete error:", error);
+            toast.error("Failed to remove item");
+        }
     }
+    
+    async function AddtoCart(product) {
 
-    async function AddtoCart(Product, ID, brand) {
-        const userId = localStorage.getItem("userId");
-        // if (!userId) {
-        //     toast.warning('please login')
-        //     nav('/login')
-        // }
-        const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-        const data = await resp.data;
-
-        if (data.cart.find((item) => item.id === ID)) {
-            toast.error(`${brand} already in the cart`)
-        } else {
-            await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-                cart: [...data.cart, Product]
-            })
-            setCartLength(data.cart.length + 1);
-            toast.success(`${brand} is added to you cart`)
+        const access = sessionStorage.getItem("access_token");
+    
+        if (!access) {
+            toast.warning("Please login first");
+            navigate("/login");
+            return;
         }
-
-
+    
+        try {
+            // Matches your Django CartView.post()
+            const resp = await api.post(
+                "/cart/",
+                {
+                    product_id: product.product.id,
+                    cartQty: 1
+                }
+            );
+            if (resp.message === "exists") {
+                toast.info(`${product.product.brand} is already in your cart`);
+            } 
+    
+            else {
+                toast.success(`${product.product.brand} added to cart`);
+                setCartLength(prev => prev + 1);  // update badge
+            }
+            
+            // OPTIONAL: update cart count in UI
+            // setCartLength(prev => prev + 1);
+    
+        } catch (error) {
+            toast.error("Could not add item to cart");
+            console.error(error);
+        }
     }
     return (
         <div>
@@ -146,10 +192,10 @@ function Wishlist() {
                                             <div className="flex flex-col md:flex-row">
                                                 {/* Product Image */}
                                                 <div className="md:w-1/3 p-8 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-                                                    <Link to={`/induvidual/${val.id}`} className="block">
+                                                    <Link to={`/induvidual/${val.product.id}`} className="block">
                                                         <img
-                                                            src={val.image}
-                                                            alt={val.model}
+                                                            src={val.product.image}
+                                                            alt={val.product.model}
                                                             className="w-48 h-auto object-contain transition-transform duration-300 hover:scale-105"
                                                         />
                                                     </Link>
@@ -158,29 +204,29 @@ function Wishlist() {
                                                 {/* Product Details */}
                                                 <div className="md:w-2/3 p-8 flex flex-col justify-between">
                                                     <div>
-                                                        <Link to={`/induvidual/${val.id}`}>
+                                                        <Link to={`/induvidual/${val.product.id}`}>
                                                             <h3 className="text-2xl font-bold text-gray-900 mb-3 hover:text-blue-600 transition-colors">
-                                                                {val.brand}
+                                                                {val.product.brand}
                                                             </h3>
                                                         </Link>
 
                                                         <div className="flex flex-wrap gap-4 mb-4">
                                                             <div className="bg-gray-100 rounded-lg px-3 py-1">
                                                                 <span className="text-sm text-gray-600">Model: </span>
-                                                                <span className="text-sm font-semibold text-gray-800">{val.model}</span>
+                                                                <span className="text-sm font-semibold text-gray-800">{val.product.model}</span>
                                                             </div>
                                                             <div className="bg-gray-100 rounded-lg px-3 py-1">
                                                                 <span className="text-sm text-gray-600">Type: </span>
-                                                                <span className="text-sm font-semibold text-gray-800">{val.type}</span>
+                                                                <span className="text-sm font-semibold text-gray-800">{val.product.category_name}</span>
                                                             </div>
                                                             <div className="bg-gray-100 rounded-lg px-3 py-1">
                                                                 <span className="text-sm text-gray-600">Frame: </span>
-                                                                <span className="text-sm font-semibold text-gray-800">{val.frame_material}</span>
+                                                                <span className="text-sm font-semibold text-gray-800">{val.product.frame_material}</span>
                                                             </div>
                                                         </div>
 
                                                         <div className="mb-6">
-                                                            <span className="text-3xl font-bold text-green-600">$ {val.price}</span>
+                                                            <span className="text-3xl font-bold text-green-600">$ {val.product.price}</span>
                                                         </div>
                                                     </div>
 
@@ -200,7 +246,7 @@ function Wishlist() {
 
                                                         <button
                                                             className="sm:w-auto bg-red-500 text-white font-medium py-3 px-6 rounded-lg hover:bg-red-600 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer text-sm"
-                                                            onClick={() => RemoveWishlist(val.id, val.brand)}
+                                                            onClick={() => RemoveWishlist(val.product.id, val.product.brand)}
                                                         >
                                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

@@ -1,22 +1,36 @@
 import { useState } from "react";
 import { LayoutDashboard, Users, Package, ShoppingCart, LogOut, Menu } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, redirect, useNavigate } from "react-router-dom";
+import { toast } from 'react-toastify';
+import axios from "axios";
 
 function AdminSidebar() {
     let nav = useNavigate();
-
-    function Logout() {
-        const adminId = localStorage.getItem("adminId");
-        // console.log(adminId);
-
-        if (adminId) {
+    async function Logout() {
+        try {
+            await axios.post(
+                'https://specspot.duckdns.org/api/v1/user/logout/',
+                { withCredentials: true }
+            );
+        } catch (error) {
+            console.error("Logout error:", error.response?.data || error);
+        } finally {
+            // console.log("Before removing token:", sessionStorage.getItem("access_token"));
+    
+            sessionStorage.removeItem("access_token");
+            localStorage.removeItem("userId");
+            localStorage.removeItem("role");
+            localStorage.removeItem("status");
+            localStorage.removeItem("userName");
             localStorage.removeItem("adminId");
-            nav('/')
+    
+            // console.log("After removing token:", sessionStorage.getItem("access_token"));
+    
+            toast.success("Logged out successfully!");
+            nav("/");
         }
-
-
-
     }
+    
 
 
     return (

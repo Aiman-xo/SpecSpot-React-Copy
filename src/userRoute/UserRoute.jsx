@@ -16,9 +16,11 @@ function UserRoute() {
     // }, [])
 
 
-    const role = localStorage.getItem("role");
-    const status = localStorage.getItem("status");
-    if (role === "user" && status === "Active") {
+    // const role = localStorage.getItem("role");
+    // const status = localStorage.getItem("status");
+    const token = sessionStorage.getItem('access_token')
+    
+    if (token) {
         return <Outlet />
     } else {
         return <Navigate to={'/'} />

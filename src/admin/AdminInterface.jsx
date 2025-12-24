@@ -5,10 +5,12 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
 function AdminInterface() {
-    // let nav = useNavigate();
+    let nav = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const admin = localStorage.getItem("adminId");
     console.log(admin);
+
+    const token = sessionStorage.getItem('access_token')
 
     return (
         <div className="flex min-h-screen">

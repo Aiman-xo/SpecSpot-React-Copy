@@ -1,52 +1,73 @@
 import axios from 'axios';
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useEffect, useState,useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../Reusables/navbar';
 import { toast } from "react-toastify";
+// import { authFetch } from '../refreshFetch/authFetch';
 import { searchContext } from '../Context-API/context';
+import api from '../refreshFetch/api';
 
 function Induvidual() {
     let { id } = useParams();
     const { setCartLength } = useContext(searchContext);
     let [induvidual, setInduvidual] = useState([]);
     let [loading, setLoading] = useState(false);
+    const productRef = useRef(null);
     let nav = useNavigate();
 
+    console.log(induvidual.image);
 
     useEffect(() => {
         async function GetInduvidualProduct() {
-            const resp = await axios.get(`https://specspot-db.onrender.com/products/${id}`);
+            const resp = await api.get(`/product/${id}/`);
             const data = await resp.data;
 
+            productRef.current = data;
             setInduvidual(data);
+            console.log(induvidual);
         }
         GetInduvidualProduct();
     }, [id])
 
-    async function AddtoCart(Product, ID, brand) {
-        const userId = localStorage.getItem("userId");
-        if (!userId) {
-            toast.warning('please login')
-            nav('/login')
+    async function AddtoCart(product) {
+
+        const access = sessionStorage.getItem("access_token");
+    
+        if (!access) {
+            toast.warning("Please login first");
+            navigate("/login");
+            return;
         }
-        const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-        const data = await resp.data;
-
-        if (data.cart.find((item) => item.id === ID)) {
-            toast.error(`${brand} already in the cart`)
-        } else {
-            await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-                cart: [...data.cart, Product]
-            })
-            setCartLength(data.cart.length + 1)
-            toast.success(`${Product.brand} is added to you cart`)
+    
+        try {
+            // Matches your Django CartView.post()
+            const resp = await api.post(
+                "/cart/",
+                {
+                    product_id: product.id,
+                    cartQty: 1
+                }
+            );
+            if (resp.message === "exists") {
+                toast.info(`${product.brand} is already in your cart`);
+            } 
+    
+            else {
+                toast.success(`${product.brand} added to cart`);
+                setCartLength(prev => prev + 1);  // update badge
+            }
+            
+            // OPTIONAL: update cart count in UI
+            // setCartLength(prev => prev + 1);
+    
+        } catch (error) {
+            toast.error("Could not add item to cart");
+            console.error(error);
         }
-
-
     }
 
 
-    function InduvidualBuy() {
+    function InduvidualBuy(product) {
         const userID = localStorage.getItem("userId")
         setLoading(true);
         if (!userID) {
@@ -56,7 +77,7 @@ function Induvidual() {
 
         setTimeout(() => {
             setLoading(false);
-            nav('/orders', { state: { induvidual } })
+            nav('/orders', { state: { induvidual: product } })
 
         }, 2000);
     }
@@ -151,13 +172,13 @@ function Induvidual() {
 
                             {/* Buttons */}
                             <div className="flex gap-4">
-                                {induvidual.Productstatus === "out-of-stock" ? (<button className="bg-red-600  text-white px-6 py-2 rounded-lg shadow-md cursor-pointer cursor-not-allowed opacity-70 " onClick={() => AddtoCart(induvidual, induvidual.id, induvidual.brand)} disabled>
+                                {induvidual.in_stock === false ? (<button className="bg-red-600  text-white px-6 py-2 rounded-lg shadow-md cursor-pointer cursor-not-allowed opacity-70 " onClick={() => AddtoCart(induvidual, induvidual.id, induvidual.brand)} disabled>
                                     Product Not Avaliable
                                 </button>) : (<button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg shadow-md cursor-pointer" onClick={() => AddtoCart(induvidual, induvidual.id, induvidual.brand)}>
                                     Add to Cart
                                 </button>)}
 
-                                {induvidual.Productstatus === "out-of-stock" ? (null) : (<button className="bg-green-600 text-white  px-6 py-2 rounded-lg hover:bg-green-700 cursor-pointer" onClick={() => InduvidualBuy()}>
+                                {induvidual.in_stock === false  ? (null) : (<button className="bg-green-600 text-white  px-6 py-2 rounded-lg hover:bg-green-700 cursor-pointer" onClick={() => InduvidualBuy(induvidual)}>
                                     Buy Now
                                 </button>)}
 
@@ -181,5 +202,6 @@ function Induvidual() {
         </div>
     )
 }
+
 
 export default Induvidual

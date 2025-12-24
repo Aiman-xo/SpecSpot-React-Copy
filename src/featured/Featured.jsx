@@ -5,6 +5,8 @@ import '../mystyle.css'
 import axios from 'axios'
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from "react-toastify";
+// import { authFetch } from '../refreshFetch/authFetch';
+import api from '../refreshFetch/api';
 import { searchContext } from '../Context-API/context';
 
 function Featured() {
@@ -18,7 +20,7 @@ function Featured() {
 
     useEffect(() => {
         async function products() {
-            const resp = await axios.get('https://specspot-db.onrender.com/products');
+            const resp = await axios.get('https://specspot.duckdns.org/api/v1/products');
             const data1 = await resp.data;
             setData(data1);
         }
@@ -30,122 +32,101 @@ function Featured() {
     //add to cart function
 
 
-    async function AddtoCart(val, ID) {
+    async function AddtoCart(product) {
+    const access = sessionStorage.getItem("access_token");
 
-        let userId = localStorage.getItem("userId");
-        if (!userId) {
-            // alert('please log in first!')
-            toast.warning('please login first..')
-            navigate('/login')
-            return
-        }
-        const UserData = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-        const data = await UserData.data;
-
-        if (data.cart.find(item => item.id === ID)) {
-            // alert(`${val.brand} already in the cart`)
-            toast.error(`${val.brand} is already in the cart`)
-        }
-        else {
-            let userId = localStorage.getItem("userId");
-            console.log('user', userId)
-            if (userId) {
-
-                await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-                    cart: [...data.cart, val]
-
-                })
-                setCartLength(data.cart.length + 1)
-
-            }
-            // else {
-
-            //     alert('please log in first!')
-            //     navigate('/login')
-            //     return
-
-            // }
-            // alert(`${val.brand} added to cart`)
-            toast.success(`${val.brand} added to the cart`)
-
-        }
-
-
-
-
-
+    if (!access) {
+        toast.warning("Please login first");
+        navigate("/login");
+        return;
     }
 
-
-
-
-
-
-
-    async function wishlist(val, ID) {
-        // const isLiked = liked[val.id] || false;
-        // setLiked(pre => {
-        //     return {
-        //         ...pre,
-        //         [val.id]: !pre[val.id]
-        //     }
-        // })
-
-
-        const isLiked = wishlist1.some(item => item.id === ID);
-
-
-        if (!isLiked) {
-
-            const userId = localStorage.getItem("userId")
-            if (!userId) {
-                // alert('please log in first!')
-                toast.warning('please login first..')
-                navigate('/login')
-                return
+    try {
+        const resp = await api.post(
+            "/cart/",
+            {
+                product_id: product.id,
+                cartQty: 1
             }
+        );
 
-            const resp = await axios.get(`https://specspot-db.onrender.com/users/${userId}`);
-            const data = await resp.data;
+        if (resp.message === "exists") {
+            toast.info(`${product.brand} is already in your cart`);
+        } else {
+            toast.success(`${product.brand} added to cart`);
+            setCartLength(prev => prev + 1); // Update navbar badge
+        }
 
-            if (data.wishlist.find((item) => item.id === ID)) {
-                // alert(`${val.brand} already in wishlist`)
-                toast.error(`${val.brand} is already in the wishlist`)
-            }
+    } catch (error) {
+        console.error("Add to cart error:", error);
+        toast.error("Failed to add item to cart");
+    }
+}
+
+
+
+
+
+
+
+
+    async function wishlist(product, ID) {
+        const access = sessionStorage.getItem("access_token");
+    
+        if (!access) {
+            toast.warning("Please login first");
+            navigate("/login");
+            return;
+        }
+    
+        // Check if already in wishlist (client-side)
+        const isLiked = wishlist1.some(item => item.product.id === ID);
+    
+        try {
+            if (!isLiked) {
+                // --------------------------
+                // ADD TO WISHLIST
+                // --------------------------
+                const resp = await api.post(
+                    "/wishlist/",
+                    { product_id: ID }
+                );
+    
+                if (resp.message === "already_exists") {
+                    toast.info(`${product.brand} is already in your wishlist`);
+                    return;
+                }
+    
+                else {
+                    toast.success(`${product.brand} added to wishlist`);
+    
+                    // update UI
+                    setWishlist(prev => [...prev, { product }]);
+                    setWishlistLength(prev => prev + 1);
+                }
+            } 
+            
             else {
-                const updatedWishlist = [...data.wishlist, val]
-                await axios.patch(`https://specspot-db.onrender.com/users/${userId}`, {
-                    wishlist: updatedWishlist
-                });
-                // alert(`${val.brand} is one of your liking`)
-                setWishlist(updatedWishlist);
-                setWishlistLength(data.wishlist.length + 1)
-
+                // --------------------------
+                // REMOVE FROM WISHLIST
+                // --------------------------
+                await api.delete(
+                    `/wishlist/${ID}/`
+                );
+    
+                toast.error(`${product.brand} removed from wishlist`);
+    
+                // update UI
+                setWishlist(prev =>
+                    prev.filter(item => item.product.id !== ID)
+                );
+                setWishlistLength(prev => prev - 1);
             }
-
-
-
+    
+        } catch (error) {
+            console.error("Wishlist error:", error);
+            toast.error("Something went wrong");
         }
-        else {
-            const userID = localStorage.getItem("userId");
-
-            const resp = await axios.get(`https://specspot-db.onrender.com/users/${userID}`);
-            const data = await resp.data;
-
-            const newFiltered = data.wishlist.filter((val) => {
-                return val.id !== ID
-            })
-
-            await axios.patch(`https://specspot-db.onrender.com/users/${userID}`, {
-                wishlist: newFiltered
-            })
-            setWishlist(newFiltered)
-            setWishlistLength(data.wishlist.length - 1)
-
-            // alert(`${val.brand} removed from wishlist`)
-        }
-
-
     }
     return (
 
@@ -153,7 +134,7 @@ function Featured() {
 
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-5xl mx-auto mt-6">
             {data.slice(0, 4).map((val) => {
-                const isLiked = wishlist1.some((item) => item.id === val.id);
+                const isLiked = wishlist1.some((item) => item.product.id === val.id);
 
                 return (
                     <div
@@ -187,16 +168,18 @@ function Featured() {
                         <div className="px-4 py-3 flex flex-col flex-grow">
                             {/* Brand + Status */}
                             <div className="flex justify-between items-center mb-1">
-                                <p className="font-bold text-lg">{val.brand}</p>
-                                <span
-                                    className={`text-xs px-2 py-0.5 rounded ${val.Productstatus === "available"
-                                        ? "bg-green-100 text-green-600"
-                                        : "bg-red-100 text-red-600"
+                                    <p className="font-bold text-lg">{val.brand}</p>
+
+                                    <span
+                                        className={`text-xs px-2 py-0.5 rounded ${
+                                            val.in_stock
+                                                ? "bg-green-100 text-green-600"
+                                                : "bg-red-100 text-red-600"
                                         }`}
-                                >
-                                    {val.Productstatus}
-                                </span>
-                            </div>
+                                    >
+                                        {val.in_stock ? "Available" : "Out of Stock"}
+                                    </span>
+                                </div>
 
                             {/* Model */}
                             <p className="text-gray-600 text-sm mb-2">{val.model}</p>

@@ -13,6 +13,7 @@ import ShippingPage from "./pages/orderpage";
 import Profile from "./featured/profile";
 import Notfound from "./pageNotFound/Notfound";
 import AdminInterface from "./admin/AdminInterface";
+import Resetpassword from "./featured/resetpassword";
 //admin imports
 import Dashboard from "./admin/pages/Dashboard";
 import Users from "./admin/pages/Users";
@@ -46,6 +47,7 @@ function App() {
 
               <Route path="/login" element={<Login />}></Route>
               <Route path="/register" element={<Rgister />}></Route>
+              <Route path="/reset-password" element={<Resetpassword/>}></Route>
 
               <Route path="/" element={<Home />}></Route>
               <Route path="/products" element={<Products />}></Route>
