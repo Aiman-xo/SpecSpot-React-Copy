@@ -8,7 +8,7 @@ import Footer from '../featured/footer'
 
 
 function Home() {
-    let [init, setInit] = useState(false);
+    // let [init, setInit] = useState(false);
     useEffect(() => {
 
         const hasSeen = localStorage.getItem("hasSeen");
@@ -26,7 +26,7 @@ function Home() {
         <div>
             <Navbar />
 
-            {init && <div className="fixed inset-0  bg-black/30 backdrop-blur-md bg-opacity-50 flex items-center justify-center z-50 p-4">
+            {/* {init && <div className="fixed inset-0  bg-black/30 backdrop-blur-md bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 mx-auto">
                     <div className="flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mx-auto mb-4">
                         <svg
@@ -62,7 +62,7 @@ function Home() {
                         </button>
                     </div>
                 </div>
-            </div>}
+            </div>} */}
 
             <Link to={'/products'}><img src="https://static5.lenskart.com/media/uploads/Desktop-v2-topbanner-celebs-style-260625.png"
                 alt="" className='cursor-pointer hover:scale-101 transition-transform duration-500' /></Link>
