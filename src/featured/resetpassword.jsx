@@ -11,14 +11,20 @@ function Resetpassword() {
         confirm_password:'',
         error:''
     })
+    let [loading, setLoading] = useState(false);
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     const reset_session = localStorage.getItem('reset_session');
     async function ResetPassword(){
+      setLoading(true); // start spinner
         try{
             const response = await axios.post('https://specspot.duckdns.org/api/v1/reset-password/',{
                 reset_session:reset_session,
                 password:newPassword.new_password,
                 confirm_password:newPassword.confirm_password
             })
+
+            await delay(800); // 👈 keep spinner visible
 
             if(response.status===200){
                 toast.success('saved changes!')
@@ -31,6 +37,7 @@ function Resetpassword() {
             }
         }
         catch(err){
+          await delay(800);
             if (err.response && err.response.status === 400) {
                 const errData = err.response.data
             
@@ -50,6 +57,9 @@ function Resetpassword() {
                 })
             }
         }
+        finally{
+          setLoading(false); // stop spinner
+      }
     }
   return (
     <div className="fixed inset-0 flex items-center justify-center">
@@ -86,11 +96,18 @@ function Resetpassword() {
       />
   
       <button
-        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition cursor-pointer"
-        onClick={ResetPassword}
-      >
-        Save
-      </button>
+      className="w-full bg-blue-600 text-white py-2 rounded-lg transition flex items-center justify-center
+        hover:bg-blue-700 cursor-pointer"
+      onClick={ResetPassword}
+      disabled={loading}
+    >
+      {loading ? (
+        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+      ) : (
+        "Save"
+      )}
+    </button>
+
   
     <p className="text-red-500 text-sm mt-3">{newPassword.error}</p>
     </div>
