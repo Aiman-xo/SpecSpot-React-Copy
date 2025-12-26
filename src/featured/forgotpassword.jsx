@@ -6,6 +6,8 @@ import api from '../refreshFetch/api'
 
 function Forgotpassword({onclose}) {
     let [showemail,setEmail]=useState({email:'',error:''})
+    let [loading, setLoading] = useState(false);
+
     let [showotp,setShowOtp] = useState(false)
     let [getotp,setOtp]=useState({
         otp:'',
@@ -14,6 +16,7 @@ function Forgotpassword({onclose}) {
     let nav = useNavigate()
     
     async function GenerateOTP(){
+        setLoading(true); // start spinner
         try{
             const response = await axios.post('https://specspot.duckdns.org/api/v1/forget-password/',{
                 email:showemail.email
@@ -38,6 +41,9 @@ function Forgotpassword({onclose}) {
                     })
                 }
             }
+        }
+        finally{
+            setLoading(false); // stop spinner
         }
 
     }
@@ -95,10 +101,18 @@ function Forgotpassword({onclose}) {
         })}
       />
   
-      <button
-        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition cursor-pointer" onClick={GenerateOTP}>
-        Generate OTP
-      </button>
+        <button
+        className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition cursor-pointer flex items-center justify-center"
+        onClick={GenerateOTP}
+        disabled={loading}
+        >
+        {loading ? (
+            <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        ) : (
+            "Generate OTP"
+        )}
+        </button>
+
 
       <div className="text-center font-bold my-3">
       <h5 className="text-red-500">{showemail.error}</h5>
