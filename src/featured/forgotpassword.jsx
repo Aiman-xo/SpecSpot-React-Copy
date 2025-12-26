@@ -6,6 +6,8 @@ import api from '../refreshFetch/api'
 
 function Forgotpassword({onclose}) {
     let [showemail,setEmail]=useState({email:'',error:''})
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     let [loading, setLoading] = useState(false);
 
     let [showotp,setShowOtp] = useState(false)
@@ -96,7 +98,7 @@ function Forgotpassword({onclose}) {
       <input
         type="email"
         placeholder="Enter your email"
-        class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
         onChange={(e)=>setEmail({
             ...showemail,
             email:e.target.value
