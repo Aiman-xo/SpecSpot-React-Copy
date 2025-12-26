@@ -21,6 +21,7 @@ function Forgotpassword({onclose}) {
             const response = await axios.post('https://specspot.duckdns.org/api/v1/forget-password/',{
                 email:showemail.email
             })
+            await delay(800);
             if (response.status==200){
                 setShowOtp(true)
                 setEmail({
@@ -32,6 +33,7 @@ function Forgotpassword({onclose}) {
             }
         }
         catch(err){
+            await delay(800);
             if(err.response){
                 const errData = err.response.data
                 if (err.response.status==400){
